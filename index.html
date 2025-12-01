@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Karim Photo Editor — Fixed Watermark</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8}
+    *{box-sizing:border-box}
+    body{font-family:Inter, 'Noto Sans Bengali', Arial, sans-serif; margin:0; background:linear-gradient(180deg,#071226 0%, #071421 100%); color:#e6eef6; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:28px}
+    .app{width:100%; max-width:980px}
+    header{display:flex; align-items:center; gap:12px; margin-bottom:18px}
+    header h1{font-size:20px; margin:0}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); border-radius:12px; padding:18px; box-shadow:0 6px 24px rgba(2,6,23,0.6)}
+    .grid{display:grid; grid-template-columns:360px 1fr; gap:16px}
+    .controls{padding:8px}
+    label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+    input[type=file]{display:block}
+    .row{display:flex; gap:8px; align-items:center; margin-bottom:10px}
+    input[type=text], select{width:100%; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:transparent; color:inherit}
+    .small{font-size:13px}
+    .preview{display:flex; flex-direction:column; align-items:center; gap:12px}
+    .canvas-wrap{background:#081426; border-radius:8px; padding:10px; display:flex; align-items:center; justify-content:center; min-height:320px}
+    canvas{max-width:100%; height:auto; border-radius:6px}
+    .btn{background:var(--accent); color:#012; padding:10px 14px; border-radius:8px; border:none; cursor:pointer; font-weight:700}
+    .btn.secondary{background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.04)}
+    .controls .help{font-size:12px; color:var(--muted); margin-top:6px}
+    .footer{display:flex; gap:8px; margin-top:12px}
+    .meta{font-size:12px; color:var(--muted)}
+    .flex-between{display:flex; justify-content:space-between; align-items:center}
+    @media(max-width:900px){.grid{grid-template-columns:1fr;}.card{padding:12px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><rect rx='8' width='36' height='36' fill='%2306b6d4'/><text x='50%' y='55%' font-size='18' font-family='Arial' font-weight='700' fill='%23001212' text-anchor='middle'>K</text></svg>" alt="logo" style="width:38px;height:38px;border-radius:8px;">
+      <h1>Karim Photo Editor — Fixed Watermark</h1>
+    </header>
+
+    <div class="card grid">
+      <div class="controls">
+        <label>১) ছবি নির্বাচন করুন</label>
+        <input id="fileInput" type="file" accept="image/*">
+        <div class="row">
+          <button id="btnLoadSample" class="btn secondary">ডেমো ইমেজ লোড করুন</button>
+        </div>
+
+        <hr style="opacity:0.06;margin:10px 0">
+
+        <label>২) ওয়াটারমার্ক লেখা</label>
+        <input id="wmText" type="text" value="Karim">
+        <label>২) ওয়াটারমার্ক লেখা</label>
+        <input id="wmText" type="text" value="Karim">
+
+        <div class="row">
+          <div style="flex:1">
+            <label class="small">ফন্ট সাইজ</label>
+            <input id="fontSize" type="range" min="20" max="240" value="80">
+          </div>
+          <div style="width:110px">
+            <label class="small">পর্দা/Opacity</label>
+            <input id="opacity" type="range" min="0" max="100" value="30">
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex:1">
+            <label class="small">ফন্ট নির্বাচন</label>
+            <select id="fontSelect">
+              <option value="Noto Sans Bengali, sans-serif">Noto Sans Bengali</option>
+              <option value="Inter, sans-serif" selected>Inter</option>
+              <option value="">System Default</option>
+            </select>
+          </div>
+        </div>
+
+        <hr style="opacity:0.06;margin:10px 0">
+
+        <label>৩) KC লোগো সেটিংস</label>
+        <div class="row">
+          <label class="small" style="flex:1">লোগো সাইজ</label>
+          <input id="kcSize" type="range" min="40" max="300" value="120">
+        </div>
+
+        <div class="row">
+          <label class="small" style="flex:1">লোগো অপাসিটি</label>
+          <input id="kcOpacity" type="range" min="0" max="100" value="95">
+        </div>
+
+        <div class="footer">
+          <button id="applyBtn" class="btn">অ্যাপ্লাই করুন</button>
+          <button id="downloadBtn" class="btn">ডাউনলোড</button>
+        </div>
+      </div>
+
+      <div class="preview">
+        <div class="canvas-wrap card">
+          <canvas id="previewCanvas" width="800" height="600"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+function loadImageFromFile(file){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{ URL.revokeObjectURL(url); res(img); };
+    img.onerror = (e)=>{ URL.revokeObjectURL(url); rej(e); };
+    img.src = url;
+  });
+}
+
+const fileInput = document.getElementById('fileInput');
+const previewCanvas = document.getElementById('previewCanvas');
+const ctx = previewCanvas.getContext('2d');
+let currentImage = null;
+let naturalW = 0, naturalH = 0;
+
+const wmText = document.getElementById('wmText');
+const fontSize = document.getElementById('fontSize');
+const opacity = document.getElementById('opacity');
+const fontSelect = document.getElementById('fontSelect');
+const kcSize = document.getElementById('kcSize');
+const kcOpacity = document.getElementById('kcOpacity');
+const applyBtn = document.getElementById('applyBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const btnLoadSample = document.getElementById('btnLoadSample');
+
+btnLoadSample.onclick = ()=>{
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=1200";
+  img.onload = ()=> setImage(img);
+};
+
+fileInput.onchange = async (e)=>{
+  const f = e.target.files?.[0];
+  if(!f) return;
+  const img = await loadImageFromFile(f);
+  setImage(img);
+};
+
+function setImage(img){
+  currentImage = img;
+  naturalW = img.naturalWidth;
+  naturalH = img.naturalHeight;
+
+  const maxW = 880, maxH = 600;
+  const ratio = Math.min(maxW/naturalW, maxH/naturalH, 1);
+  previewCanvas.width = naturalW * ratio;
+  previewCanvas.height = naturalH * ratio;
+  drawPreview();
+}
+
+function applyWatermarks(c, image, opt){
+  const ct = c.getContext('2d');
+  ct.clearRect(0,0,c.width,c.height);
+  ct.drawImage(image,0,0,c.width,c.height);
+
+  // ONE LINE WATERMARK ONLY
+  const text = opt.text;
+  const fs = opt.fontSize * (c.width / 800);
+  ct.save();
+  ct.globalAlpha = opt.opacity / 100;
+  ct.font = `${fs}px ${opt.font}`;
+  ct.textAlign = 'center';
+  ct.textBaseline = 'middle';
+
+  // centered watermark
+  ct.fillStyle = 'rgba(0,0,0,0.35)';
+  ct.fillText(text, c.width/2 + 3, c.height/2 + 3);
+  ct.fillStyle = 'white';
+  ct.fillText(text, c.width/2, c.height/2);
+
+  ct.restore();
+
+  drawKC(ct, c.width, c.height, opt.kcSize, opt.kcOpacity);
+}
+
+function drawKC(ct, W, H, size, op){
+  const off = document.createElement('canvas');
+  off.width = off.height = size*2;
+  const o = off.getContext('2d');
+  const r = off.width/2;
+
+  const g = o.createLinearGradient(0,0,off.width,off.height);
+  g.addColorStop(0,'#0ea5b8');
+  g.addColorStop(1,'#0369a1');
+  o.fillStyle=g;
+  o.beginPath();
+  o.arc(r,r,r,0,Math.PI*2);
+  o.fill();
+
+  o.font = `${r}px Inter`;
+  o.textAlign='center';
+  o.textBaseline='middle';
+  o.fillStyle='white';
+  o.fillText('KC',r,r);
+
+  ct.save();
+  ct.globalAlpha = op/100;
+  const m = size*0.15;
+  ct.drawImage(off, W-size-m, m, size, size);
+  ct.restore();
+}
+
+function drawPreview(){
+  if(!currentImage){
+    ctx.fillStyle='#071223'; ctx.fillRect(0,0,previewCanvas.width,previewCanvas.height);
+    return;
+  }
+  const tmp = document.createElement('canvas');
+  tmp.width = naturalW;
+  tmp.height = naturalH;
+
+  applyWatermarks(tmp, currentImage, {
+    text: wmText.value,
+    font: fontSelect.value,
+    fontSize: Number(fontSize.value),
+    opacity: Number(opacity.value),
+    kcSize: Number(kcSize.value),
+    kcOpacity: Number(kcOpacity.value)
+  });
+
+  ctx.clearRect(0,0,previewCanvas.width,previewCanvas.height);
+  ctx.drawImage(tmp,0,0,tmp.width,tmp.height,0,0,previewCanvas.width,previewCanvas.height);
+}
+
+applyBtn.onclick = drawPreview;
+[wmText,fontSize,opacity,fontSelect,kcSize,kcOpacity].forEach(x=> x.oninput = drawPreview);
+
+downloadBtn.onclick = ()=>{
+  const f = document.createElement('canvas');
+  f.width = naturalW; f.height = naturalH;
+
+  applyWatermarks(f, currentImage, {
+    text: wmText.value,
+    font: fontSelect.value,
+    fontSize: Number(fontSize.value),
+    opacity: Number(opacity.value),
+    kcSize: Number(kcSize.value),
+    kcOpacity: Number(kcOpacity.value)
+  });
+
+  f.toBlob(b=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download='karim_edited.png';
+    a.click();
+  });
+};
+</script>
+</body>
+</html>
